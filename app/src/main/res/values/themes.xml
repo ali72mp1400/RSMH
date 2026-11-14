@@ -1,0 +1,11 @@
+<resources>
+    <style name="Theme.RSMH" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">#1B4332</item>
+        <item name="colorPrimaryVariant">#081C15</item>
+        <item name="colorOnPrimary">#FFFFFF</item>
+        <item name="colorSecondary">#2D6A4F</item>
+        <item name="android:windowBackground">#0F1419</item>
+        <item name="android:statusBarColor">#0F1419</item>
+        <item name="android:navigationBarColor">#0F1419</item>
+    </style>
+</resources>
