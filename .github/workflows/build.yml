@@ -34,7 +34,12 @@ jobs:
         export PATH="$PATH:$(go env GOPATH)/bin"
         gomobile bind -v -androidapi 23 -javapkg=io.nekohasekai -libname=box -trimpath -buildvcs=false -target=android/arm64 -tags "with_gvisor,with_quic,with_utls,with_clash_api,with_wireguard,badlinkname,tfogo_checklinkname0" -ldflags "-X runtime.godebugDefault=multipathtcp=0,tlssha1=1 -checklinkname=0 -s -w -buildid=" -o libbox.aar ./experimental/libbox
         mkdir -p ../app/libs
-        cp libbox.aar ../app/libs/
+           - name: Show libbox API
+     run: |
+        mkdir -p /tmp/lb
+        unzip -o app/libs/libbox.aar classes.jar -d /tmp/lb
+        unzip -Z1 /tmp/lb/classes.jar | grep libbox | head -80
+        javap -cp /tmp/lb/classes.jar io.nekohasekai.libbox.Libbox io.nekohasekai.libbox.PlatformInterface io.nekohasekai.libbox.SetupOptions io.nekohasekai.libbox.CommandServer io.nekohasekai.libbox.TunOptions || true cp libbox.aar ../app/libs/
 
     - name: Set up Gradle
       uses: gradle/actions/setup-gradle@v4
