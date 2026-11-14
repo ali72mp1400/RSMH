@@ -19,6 +19,23 @@ jobs:
         distribution: 'temurin'
         java-version: '17'
 
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: stable
+
+    - name: Build libbox.aar
+      run: |
+        git clone https://github.com/SagerNet/sing-box.git
+        cd sing-box
+        TAG=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
+        git checkout "$TAG"
+        make lib_install
+        export PATH="$PATH:$(go env GOPATH)/bin"
+        go run ./cmd/internal/build_libbox -target android
+        mkdir -p ../app/libs
+        cp libbox.aar ../app/libs/
+
     - name: Set up Gradle
       uses: gradle/actions/setup-gradle@v4
       with:
