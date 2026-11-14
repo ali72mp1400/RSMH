@@ -15,24 +15,31 @@ import android.widget.EditText
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
+import java.io.File
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var etConfig: EditText
     private lateinit var etDns: EditText
+    private lateinit var btnUpdate: Button
     private lateinit var btnConnect: Button
     private lateinit var tvStatus: TextView
+    private lateinit var tvCount: TextView
+    private lateinit var rv: RecyclerView
+    private lateinit var adapter: ServerAdapter
+
+    private val prefs by lazy { getSharedPreferences("rsmh", Context.MODE_PRIVATE) }
 
     private val vpnPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
-            startVpnService()
-        } else {
-            Toast.makeText(this, "مجوز اتصال VPN رد شد", Toast.LENGTH_SHORT).show()
-        }
+        if (result.resultCode == Activity.RESULT_OK) startVpnService()
+        else toast("مجوز اتصال VPN رد شد")
     }
 
     private val notificationLauncher = registerForActivityResult(
@@ -53,8 +60,19 @@ class MainActivity : AppCompatActivity() {
 
         etConfig = findViewById(R.id.etConfig)
         etDns = findViewById(R.id.etDns)
+        btnUpdate = findViewById(R.id.btnUpdate)
         btnConnect = findViewById(R.id.btnConnect)
         tvStatus = findViewById(R.id.tvStatus)
+        tvCount = findViewById(R.id.tvCount)
+        rv = findViewById(R.id.rvServers)
+
+        tvStatus.setOnLongClickListener {
+            val f = File(filesDir, "box.log")
+            val text = if (f.exists()) f.readLines().takeLast(30).joinToString("\n") else "لاگی نیست"
+            AlertDialog.Builder(this).setTitle("لاگ").setMessage(text)
+                .setPositiveButton("باشه", null).show()
+            true
+        }
 
         if (Build.VERSION.SDK_INT >= 33 &&
             ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
@@ -62,6 +80,21 @@ class MainActivity : AppCompatActivity() {
         ) {
             notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
+
+        etConfig.setText(prefs.getString("source", ""))
+        etDns.setText(prefs.getString("dns", ""))
+
+        adapter = ServerAdapter { pos -> prefs.edit().putInt("selected", pos).apply() }
+        adapter.selected = prefs.getInt("selected", 0)
+        rv.layoutManager = LinearLayoutManager(this)
+        rv.adapter = adapter
+
+        val body = prefs.getString("body", "") ?: ""
+        val saved = try { SubscriptionParser.parseNodes(body) } catch (e: Exception) { emptyList() }
+        adapter.submit(saved)
+        updateCount(saved.size)
+
+        btnUpdate.setOnClickListener { updateSubscription() }
 
         btnConnect.setOnClickListener {
             val s = HiddifyVpnService.state
@@ -88,60 +121,97 @@ class MainActivity : AppCompatActivity() {
         super.onStop()
     }
 
+    private fun toast(msg: String) = Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
+
+    private fun updateCount(n: Int) {
+        tvCount.text = if (n > 0) "فهرست سرورها ($n)" else "فهرست سرورها"
+    }
+
+    private fun updateSubscription() {
+        val src = etConfig.text.toString().trim()
+        if (src.isEmpty()) {
+            toast("لینک اشتراک رو وارد کن")
+            return
+        }
+        btnUpdate.isEnabled = false
+        Thread {
+            try {
+                val body = SubscriptionParser.fetchBody(src)
+                val nodes = SubscriptionParser.parseNodes(body)
+                runOnUiThread {
+                    if (nodes.isEmpty()) {
+                        toast("هیچ کانفیگ معتبری پیدا نشد")
+                    } else {
+                        prefs.edit().putString("source", src).putString("body", body)
+                            .putInt("selected", 0).apply()
+                        adapter.selected = 0
+                        adapter.submit(nodes)
+                        updateCount(nodes.size)
+                        toast("${nodes.size} سرور دریافت شد")
+                    }
+                    btnUpdate.isEnabled = true
+                }
+            } catch (e: Exception) {
+                runOnUiThread {
+                    toast("خطا: ${e.message}")
+                    btnUpdate.isEnabled = true
+                }
+            }
+        }.start()
+    }
+
     private fun applyState(state: String, message: String) {
         when (state) {
             HiddifyVpnService.STATE_CONNECTED -> {
-                tvStatus.text = getString(R.string.status_connected)
-                btnConnect.text = getString(R.string.disconnect)
-                btnConnect.isEnabled = true
-                btnConnect.setBackgroundColor(ContextCompat.getColor(this, android.R.color.holo_red_dark))
+                tvStatus.text = "متصل و ایمن ($message)"
+                setConnectButton(true)
             }
             HiddifyVpnService.STATE_CONNECTING -> {
                 tvStatus.text = "در حال اتصال..."
-                btnConnect.text = getString(R.string.disconnect)
-                btnConnect.isEnabled = true
-                btnConnect.setBackgroundColor(ContextCompat.getColor(this, android.R.color.holo_red_dark))
+                setConnectButton(true)
             }
             HiddifyVpnService.STATE_ERROR -> {
                 tvStatus.text = "خطا: $message"
-                resetButton()
+                setConnectButton(false)
             }
             else -> {
-                tvStatus.text = getString(R.string.status_disconnected)
-                resetButton()
+                tvStatus.text = "قطع شد"
+                setConnectButton(false)
             }
         }
     }
 
-    private fun resetButton() {
-        btnConnect.text = getString(R.string.connect)
-        btnConnect.isEnabled = true
-        btnConnect.setBackgroundColor(ContextCompat.getColor(this, android.R.color.holo_green_dark))
+    private fun setConnectButton(connected: Boolean) {
+        btnConnect.text = if (connected) "قطع اتصال" else "اتصال به سرور"
+        btnConnect.setBackgroundColor(if (connected) 0xFFCC0000.toInt() else 0xFF2D7BFF.toInt())
     }
 
     private fun prepareVpn() {
-        val intent = VpnService.prepare(this)
-        if (intent != null) {
-            vpnPermissionLauncher.launch(intent)
-        } else {
-            startVpnService()
+        val body = prefs.getString("body", "") ?: ""
+        if (body.isEmpty()) {
+            toast("اول لینک اشتراک رو بذار و به‌روزرسانی بزن")
+            return
         }
+        val intent = VpnService.prepare(this)
+        if (intent != null) vpnPermissionLauncher.launch(intent) else startVpnService()
     }
 
     private fun startVpnService() {
+        val dns = etDns.text.toString().trim()
+        prefs.edit().putString("dns", dns).apply()
         val intent = Intent(this, HiddifyVpnService::class.java).apply {
             action = HiddifyVpnService.ACTION_CONNECT
-            putExtra(HiddifyVpnService.EXTRA_CONFIG, etConfig.text.toString().trim())
-            putExtra(HiddifyVpnService.EXTRA_DNS, etDns.text.toString().trim())
+            putExtra(HiddifyVpnService.EXTRA_CONFIG, prefs.getString("body", "") ?: "")
+            putExtra(HiddifyVpnService.EXTRA_DNS, dns)
+            putExtra(HiddifyVpnService.EXTRA_INDEX, adapter.selected - 1)
         }
         ContextCompat.startForegroundService(this, intent)
         applyState(HiddifyVpnService.STATE_CONNECTING, "")
     }
 
     private fun stopVpnService() {
-        val intent = Intent(this, HiddifyVpnService::class.java).apply {
+        startService(Intent(this, HiddifyVpnService::class.java).apply {
             action = HiddifyVpnService.ACTION_DISCONNECT
-        }
-        startService(intent)
+        })
     }
 }
