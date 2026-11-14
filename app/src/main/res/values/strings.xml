@@ -1,0 +1,11 @@
+<resources>
+    <string name="app_name">RSMH</string>
+    <string name="subtitle">اتصال امن و پرسرعت با معماری کلاسیک</string>
+    <string name="dns_hint">سرور DNS (مثلاً 1.1.1.1 یا 8.8.8.8)</string>
+    <string name="config_hint">لینک اشتراک (Subscription) یا کانفیگ</string>
+    <string name="connect">اتصال</string>
+    <string name="disconnect">قطع اتصال</string>
+    <string name="connecting">در حال برقراری اتصال...</string>
+    <string name="status_disconnected">وضعیت: غیرفعال</string>
+    <string name="status_connected">وضعیت: متصل و ایمن</string>
+</resources>
