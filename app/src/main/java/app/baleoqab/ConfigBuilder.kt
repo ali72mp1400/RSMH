@@ -6,13 +6,12 @@ import org.json.JSONObject
 object ConfigBuilder {
     private const val MAX_NODES = 30
 
-    fun build(nodes: List<JSONObject>, dnsList: List<String>): String {
+    fun build(nodes: List<JSONObject>, dnsList: List<String>, logPath: String? = null): String {
         val used = nodes.take(MAX_NODES)
         val tags = JSONArray()
         used.forEach { tags.put(it.getString("tag")) }
 
         val remoteDns = dnsList.firstOrNull() ?: "1.1.1.1"
-        val directDns = dnsList.getOrNull(1) ?: remoteDns
 
         val outbounds = JSONArray()
         used.forEach { outbounds.put(it) }
@@ -27,9 +26,9 @@ object ConfigBuilder {
         val dns = JSONObject()
             .put(
                 "servers", JSONArray()
-                    .put(JSONObject().put("type", "udp").put("tag", "dns-direct").put("server", directDns))
+                    .put(JSONObject().put("type", "local").put("tag", "dns-direct"))
                     .put(
-                        JSONObject().put("type", "udp").put("tag", "dns-remote")
+                        JSONObject().put("type", "https").put("tag", "dns-remote")
                             .put("server", remoteDns).put("detour", "proxy")
                     )
             )
@@ -53,8 +52,11 @@ object ConfigBuilder {
                     .put(JSONObject().put("ip_is_private", true).put("outbound", "direct"))
             )
 
+        val log = JSONObject().put("level", "info").put("timestamp", true)
+        if (logPath != null) log.put("output", logPath)
+
         return JSONObject()
-            .put("log", JSONObject().put("level", "info"))
+            .put("log", log)
             .put("dns", dns)
             .put("inbounds", JSONArray().put(tun))
             .put("outbounds", outbounds)
