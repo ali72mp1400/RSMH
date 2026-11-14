@@ -32,7 +32,7 @@ jobs:
         git checkout "$TAG"
         make lib_install
         export PATH="$PATH:$(go env GOPATH)/bin"
-        go run ./cmd/internal/build_libbox -target android
+        gomobile bind -v -androidapi 23 -javapkg=io.nekohasekai -libname=box -trimpath -buildvcs=false -target=android/arm64 -tags "with_gvisor,with_quic,with_utls,with_clash_api,with_wireguard,badlinkname,tfogo_checklinkname0" -ldflags "-X runtime.godebugDefault=multipathtcp=0,tlssha1=1 -checklinkname=0 -s -w -buildid=" -o libbox.aar ./experimental/libbox
         mkdir -p ../app/libs
         cp libbox.aar ../app/libs/
 
