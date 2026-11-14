@@ -41,6 +41,7 @@ import io.nekohasekai.libbox.StringIterator
 import io.nekohasekai.libbox.SystemProxyStatus
 import io.nekohasekai.libbox.TunOptions
 import io.nekohasekai.libbox.WIFIState
+import java.io.File
 import java.net.Inet4Address
 import java.net.Inet6Address
 import java.net.InetAddress
@@ -99,6 +100,7 @@ class HiddifyVpnService : VpnService(), PlatformInterface, CommandServerHandler 
         const val ACTION_STATUS = "app.baleoqab.STATUS"
         const val EXTRA_CONFIG = "extra_config"
         const val EXTRA_DNS = "extra_dns"
+        const val EXTRA_INDEX = "extra_index"
         const val EXTRA_STATE = "state"
         const val EXTRA_MESSAGE = "message"
         const val STATE_DISCONNECTED = "disconnected"
@@ -125,10 +127,11 @@ class HiddifyVpnService : VpnService(), PlatformInterface, CommandServerHandler 
             ACTION_CONNECT -> {
                 val config = intent.getStringExtra(EXTRA_CONFIG) ?: ""
                 val dns = intent.getStringExtra(EXTRA_DNS) ?: ""
+                val index = intent.getIntExtra(EXTRA_INDEX, -1)
                 startForegroundCompat()
                 if (state != STATE_CONNECTING && state != STATE_CONNECTED) {
                     publish(STATE_CONNECTING, "")
-                    Thread { connect(config, dns) }.start()
+                    Thread { connect(config, dns, index) }.start()
                 }
             }
             ACTION_DISCONNECT -> disconnect()
@@ -136,11 +139,18 @@ class HiddifyVpnService : VpnService(), PlatformInterface, CommandServerHandler 
         return START_NOT_STICKY
     }
 
-    private fun connect(input: String, dnsInput: String) {
+    private fun connect(input: String, dnsInput: String, index: Int) {
         try {
-            val nodes = SubscriptionParser.load(input)
+            val all = SubscriptionParser.load(input)
+            val nodes = if (index in all.indices) listOf(all[index]) else all
             if (nodes.isEmpty()) throw IllegalStateException("هیچ کانفیگ معتبری پیدا نشد")
-            val configJson = ConfigBuilder.build(nodes, DnsConfigGenerator.generateDnsRules(dnsInput))
+            val logFile = File(filesDir, "box.log")
+            logFile.delete()
+            val configJson = ConfigBuilder.build(
+                nodes,
+                DnsConfigGenerator.generateDnsRules(dnsInput),
+                logFile.path
+            )
             Libbox.checkConfig(configJson)
             setupLibbox()
             val server = Libbox.newCommandServer(this, this)
