@@ -2,7 +2,6 @@ package app.baleoqab
 
 import android.net.Uri
 import android.util.Base64
-import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
@@ -15,7 +14,7 @@ object SubscriptionParser {
     // برای سازگاری با کدهای قدیمی
     fun parseConfig(input: String): String = input.trim()
 
-    /** لینک subscription یا متن کانفیگ‌ها رو میگیره و لیست outbound برمیگردونه. روی thread پس‌زمینه صدا بزن. */
+    /** روی thread پس‌زمینه صدا بزن. */
     fun load(input: String): List<JSONObject> = parseNodes(fetchBody(input)).map { it.outbound }
 
     fun fetchBody(input: String): String {
@@ -52,7 +51,7 @@ object SubscriptionParser {
     private fun nameOf(l: String): String {
         if (l.startsWith("vmess://")) {
             return try {
-                JSONObject(b64(l.removePrefix("vmess://").trim())).optString("ps")
+                JSONObject(LinkParsers.b64(l.removePrefix("vmess://").trim())).optString("ps")
             } catch (e: Exception) { "" }
         }
         return Uri.decode(l.substringAfter('#', "")).trim()
@@ -67,20 +66,12 @@ object SubscriptionParser {
         }
     }
 
-    private fun b64(s: String): String = try {
-        String(Base64.decode(s, Base64.DEFAULT), StandardCharsets.UTF_8)
-    } catch (e: Exception) {
-        String(Base64.decode(s, Base64.URL_SAFE), StandardCharsets.UTF_8)
-    }
-
     private fun parseOne(l: String): JSONObject? = when {
-        l.startsWith("vless://") -> vless(l)
-        l.startsWith("vmess://") -> vmess(l)
-        l.startsWith("trojan://") -> trojan(l)
-        l.startsWith("ss://") -> shadowsocks(l)
-        l.startsWith("hy2://") || l.startsWith("hysteria2://") -> hysteria2(l)
+        l.startsWith("vless://") -> LinkParsers.vless(l)
+        l.startsWith("vmess://") -> LinkParsers.vmess(l)
+        l.startsWith("trojan://") -> LinkParsers.trojan(l)
+        l.startsWith("ss://") -> LinkParsers.shadowsocks(l)
+        l.startsWith("hy2://") || l.startsWith("hysteria2://") -> LinkParsers.hysteria2(l)
         else -> null
     }
-
-    private fun supported(t: String?) =
-        t.isNullOrEmpty() || t i
+}
