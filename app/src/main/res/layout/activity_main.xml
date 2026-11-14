@@ -2,78 +2,96 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#0F1419"
+    android:background="#0F141A"
+    android:layoutDirection="rtl"
     android:orientation="vertical"
-    android:padding="24dp"
-    android:gravity="center_horizontal">
-
-    <!-- عنوان برنامه -->
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/app_name"
-        android:textColor="#FFFFFF"
-        android:textSize="32sp"
-        android:textStyle="bold"
-        android:layout_marginTop="32dp" />
+    android:padding="16dp">
 
     <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/subtitle"
-        android:textColor="#8899A6"
-        android:textSize="14sp"
-        android:layout_marginTop="4dp"
-        android:layout_marginBottom="40dp" />
-
-    <!-- فیلد ورود لینک یا کانفیگ -->
-    <EditText
-        android:id="@+id/etConfig"
         android:layout_width="match_parent"
-        android:layout_height="120dp"
-        android:background="#192734"
-        android:hint="@string/config_hint"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:text="RSMH"
         android:textColor="#FFFFFF"
-        android:textColorHint="#8899A6"
-        android:textSize="14sp"
-        android:padding="16dp"
-        android:gravity="top|start"
-        android:inputType="textMultiLine"
-        android:layout_marginBottom="16dp" />
+        android:textSize="28sp"
+        android:textStyle="bold" />
 
-    <!-- فیلد تنظیمات DNS -->
+    <TextView
+        android:id="@+id/tvStatus"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:background="@drawable/rsmh_card"
+        android:gravity="center"
+        android:padding="16dp"
+        android:text="قطع شد"
+        android:textColor="#FFFFFF"
+        android:textSize="18sp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <EditText
+            android:id="@+id/etConfig"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:background="@drawable/rsmh_card"
+            android:hint="لینک اشتراک"
+            android:inputType="textUri"
+            android:maxLines="1"
+            android:padding="12dp"
+            android:textColor="#FFFFFF"
+            android:textColorHint="#7A8A99"
+            android:textDirection="ltr" />
+
+        <Button
+            android:id="@+id/btnUpdate"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:text="به‌روزرسانی" />
+    </LinearLayout>
+
     <EditText
         android:id="@+id/etDns"
         android:layout_width="match_parent"
-        android:layout_height="50dp"
-        android:background="#192734"
-        android:hint="@string/dns_hint"
-        android:textColor="#FFFFFF"
-        android:textColorHint="#8899A6"
-        android:textSize="14sp"
-        android:paddingHorizontal="16dp"
-        android:inputType="text"
-        android:layout_marginBottom="32dp" />
-
-    <!-- وضعیت اتصال -->
-    <TextView
-        android:id="@+id/tvStatus"
-        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="@string/status_disconnected"
-        android:textColor="#8899A6"
-        android:textSize="16sp"
-        android:layout_marginBottom="24dp" />
+        android:layout_marginTop="8dp"
+        android:background="@drawable/rsmh_card"
+        android:hint="DNS (اختیاری، مثلاً 1.1.1.1)"
+        android:inputType="text"
+        android:maxLines="1"
+        android:padding="12dp"
+        android:textColor="#FFFFFF"
+        android:textColorHint="#7A8A99"
+        android:textDirection="ltr" />
 
-    <!-- دکمه اتصال / قطع اتصال -->
+    <TextView
+        android:id="@+id/tvCount"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="14dp"
+        android:layout_marginBottom="8dp"
+        android:text="فهرست سرورها"
+        android:textColor="#C9D6E2"
+        android:textSize="15sp" />
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rvServers"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
     <Button
         android:id="@+id/btnConnect"
         android:layout_width="match_parent"
         android:layout_height="56dp"
-        android:text="@string/connect"
-        android:textColor="#FFFFFF"
-        android:textSize="16sp"
-        android:textStyle="bold"
-        android:backgroundTint="#2D6A4F" />
-
+        android:layout_marginTop="8dp"
+        android:text="اتصال به سرور"
+        android:textColor="#FFFFFF" />
 </LinearLayout>
