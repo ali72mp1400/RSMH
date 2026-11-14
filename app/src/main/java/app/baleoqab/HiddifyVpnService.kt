@@ -6,7 +6,7 @@ import android.os.ParcelFileDescriptor
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.nio.ByteBuffer
-import java.channels.FileChannel
+import java.nio.channels.FileChannel
 
 class HiddifyVpnService : VpnService() {
 
