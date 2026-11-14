@@ -40,8 +40,9 @@ jobs:
       run: |
         mkdir -p /tmp/lb
         unzip -o app/libs/libbox.aar classes.jar -d /tmp/lb
-        unzip -Z1 /tmp/lb/classes.jar | grep libbox | head -80
-        javap -cp /tmp/lb/classes.jar io.nekohasekai.libbox.Libbox io.nekohasekai.libbox.PlatformInterface io.nekohasekai.libbox.SetupOptions io.nekohasekai.libbox.CommandServer io.nekohasekai.libbox.TunOptions || true
+        for c in CommandServerHandler OverrideOptions RoutePrefix RoutePrefixIterator StringIterator StringBox InterfaceUpdateListener NetworkInterfaceIterator NetworkInterface LocalDNSTransport ExchangeContext Notification PlatformUser WIFIState NeighborUpdateListener BridgeOptions BridgeSession ConnectionOwner ShellSession; do
+          javap -cp /tmp/lb/classes.jar io.nekohasekai.libbox.$c || true
+        done
 
     - name: Set up Gradle
       uses: gradle/actions/setup-gradle@v4
