@@ -71,20 +71,41 @@
         android:textColorHint="#7A8A99"
         android:textDirection="ltr" />
 
-    <TextView
-        android:id="@+id/tvCount"
+    <Button
+        android:id="@+id/btnApps"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="14dp"
-        android:layout_marginBottom="8dp"
-        android:text="فهرست سرورها"
-        android:textColor="#C9D6E2"
-        android:textSize="15sp" />
+        android:layout_marginTop="8dp"
+        android:text="انتخاب برنامه‌ها" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/tvCount"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="فهرست سرورها"
+            android:textColor="#C9D6E2"
+            android:textSize="15sp" />
+
+        <Button
+            android:id="@+id/btnPing"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="تست تأخیر" />
+    </LinearLayout>
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rvServers"
         android:layout_width="match_parent"
         android:layout_height="0dp"
+        android:layout_marginTop="4dp"
         android:layout_weight="1" />
 
     <Button
