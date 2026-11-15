@@ -4,6 +4,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.net.ConnectivityManager
@@ -274,6 +275,11 @@ class HiddifyVpnService : VpnService(), PlatformInterface, CommandServerHandler 
             options.getInet6RouteAddress()?.forEachPrefix { builder.addRoute(it.address(), it.prefix()) }
 
             var hasInclude = false
+            val chosen = getSharedPreferences("rsmh", Context.MODE_PRIVATE)
+                .getStringSet("vpn_apps", emptySet()) ?: emptySet()
+            for (pkg in chosen) {
+                try { builder.addAllowedApplication(pkg); hasInclude = true } catch (e: Exception) { Log.w(TAG, e) }
+            }
             options.getIncludePackage()?.forEachString {
                 try { builder.addAllowedApplication(it); hasInclude = true } catch (e: Exception) { Log.w(TAG, e) }
             }
