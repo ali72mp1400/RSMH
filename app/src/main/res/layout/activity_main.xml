@@ -2,117 +2,206 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#0F141A"
+    android:background="@drawable/bg_app"
     android:layoutDirection="rtl"
     android:orientation="vertical"
-    android:padding="16dp">
-
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:gravity="center"
-        android:text="RSMH"
-        android:textColor="#FFFFFF"
-        android:textSize="28sp"
-        android:textStyle="bold" />
-
-    <TextView
-        android:id="@+id/tvStatus"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
-        android:background="@drawable/rsmh_card"
-        android:gravity="center"
-        android:padding="16dp"
-        android:text="قطع شد"
-        android:textColor="#FFFFFF"
-        android:textSize="18sp" />
+    android:paddingStart="16dp"
+    android:paddingTop="12dp"
+    android:paddingEnd="16dp"
+    android:paddingBottom="12dp">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
         android:gravity="center_vertical"
         android:orientation="horizontal">
 
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="RSMH"
+                android:textColor="#FFFFFF"
+                android:textSize="26sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="اتصال امن و سبک"
+                android:textColor="#8FA3B5"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/btnAdvanced"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:clickable="true"
+            android:focusable="true"
+            android:padding="10dp"
+            android:text="⚙"
+            android:textColor="#C9D6E2"
+            android:textSize="22sp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/advancedBox"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:background="@drawable/rsmh_card"
+        android:orientation="vertical"
+        android:padding="10dp"
+        android:visibility="gone">
+
         <EditText
             android:id="@+id/etConfig"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@null"
+            android:hint="لینک اشتراک دلخواه (اختیاری)"
+            android:inputType="textUri"
+            android:maxLines="1"
+            android:padding="8dp"
+            android:textColor="#FFFFFF"
+            android:textColorHint="#7A8A99"
+            android:textDirection="ltr"
+            android:textSize="14sp" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#22324F" />
+
+        <EditText
+            android:id="@+id/etDns"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@null"
+            android:hint="DNS (اختیاری، مثلاً 1.1.1.1)"
+            android:inputType="text"
+            android:maxLines="1"
+            android:padding="8dp"
+            android:textColor="#FFFFFF"
+            android:textColorHint="#7A8A99"
+            android:textDirection="ltr"
+            android:textSize="14sp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="14dp"
+        android:gravity="center_horizontal"
+        android:orientation="vertical">
+
+        <ImageView
+            android:id="@+id/btnConnect"
+            android:layout_width="120dp"
+            android:layout_height="120dp"
+            android:background="@drawable/bg_power_off"
+            android:clickable="true"
+            android:contentDescription="اتصال"
+            android:elevation="8dp"
+            android:focusable="true"
+            android:padding="34dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/ic_power" />
+
+        <TextView
+            android:id="@+id/tvStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:text="قطع شد"
+            android:textColor="#FFFFFF"
+            android:textSize="20sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tvSub"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:gravity="center"
+            android:text="برای اتصال، دکمه را بزن"
+            android:textColor="#8FA3B5"
+            android:textSize="12sp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="14dp"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/btnUpdate"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:background="@drawable/rsmh_card"
-            android:hint="لینک اشتراک"
-            android:inputType="textUri"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
             android:maxLines="1"
-            android:padding="12dp"
-            android:textColor="#FFFFFF"
-            android:textColorHint="#7A8A99"
-            android:textDirection="ltr" />
-
-        <Button
-            android:id="@+id/btnUpdate"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:text="به‌روزرسانی" />
-    </LinearLayout>
-
-    <EditText
-        android:id="@+id/etDns"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:background="@drawable/rsmh_card"
-        android:hint="DNS (اختیاری، مثلاً 1.1.1.1)"
-        android:inputType="text"
-        android:maxLines="1"
-        android:padding="12dp"
-        android:textColor="#FFFFFF"
-        android:textColorHint="#7A8A99"
-        android:textDirection="ltr" />
-
-    <Button
-        android:id="@+id/btnApps"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:text="انتخاب برنامه‌ها" />
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
-        android:gravity="center_vertical"
-        android:orientation="horizontal">
+            android:padding="11dp"
+            android:text="⟳ به‌روزرسانی"
+            android:textColor="#E6EDF7"
+            android:textSize="12sp" />
 
         <TextView
-            android:id="@+id/tvCount"
+            android:id="@+id/btnPing"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
             android:layout_weight="1"
-            android:text="فهرست سرورها"
-            android:textColor="#C9D6E2"
-            android:textSize="15sp" />
+            android:background="@drawable/rsmh_card"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:maxLines="1"
+            android:padding="11dp"
+            android:text="⚡ تست تأخیر"
+            android:textColor="#E6EDF7"
+            android:textSize="12sp" />
 
-        <Button
-            android:id="@+id/btnPing"
-            android:layout_width="wrap_content"
+        <TextView
+            android:id="@+id/btnApps"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:text="تست تأخیر" />
+            android:layout_marginStart="8dp"
+            android:layout_weight="1"
+            android:background="@drawable/rsmh_card"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:maxLines="1"
+            android:padding="11dp"
+            android:text="▦ برنامه‌ها"
+            android:textColor="#E6EDF7"
+            android:textSize="12sp" />
     </LinearLayout>
+
+    <TextView
+        android:id="@+id/tvCount"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:layout_marginBottom="8dp"
+        android:text="فهرست سرورها"
+        android:textColor="#C9D6E2"
+        android:textSize="14sp" />
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rvServers"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_marginTop="4dp"
         android:layout_weight="1" />
-
-    <Button
-        android:id="@+id/btnConnect"
-        android:layout_width="match_parent"
-        android:layout_height="56dp"
-        android:layout_marginTop="8dp"
-        android:text="اتصال به سرور"
-        android:textColor="#FFFFFF" />
 </LinearLayout>
