@@ -1,26 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- کوه دماوند (بدنه اصلی کوه) -->
     <path
-        android:fillColor="#2C3E50"
-        android:pathData="M14,82 L48,30 C51,26 57,26 60,30 L94,82 Z" />
+        android:fillColor="#FF1B2A44"
+        android:pathData="M0,84 Q14,76 28,82 Q40,86 54,80 Q70,74 84,82 Q96,86 108,80 L108,108 L0,108 Z" />
 
-    <!-- سایه سمت راست کوه برای حس سه‌بعدی و کلاسیک -->
     <path
-        android:fillColor="#1A252F"
-        android:pathData="M54,27 L60,30 L94,82 L54,82 Z" />
+        android:fillColor="#FF9A8F86"
+        android:pathData="M54,34 Q36,62 4,90 L4,108 L104,108 L104,90 Q72,62 54,34 Z" />
 
-    <!-- قله برفی کوه دماوند -->
     <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M48,30 C51,26 57,26 60,30 L70,46 L63,43 L58,49 L54,44 L49,49 L44,43 L38,46 Z" />
+        android:fillAlpha="0.65"
+        android:fillColor="#FF2E3650"
+        android:pathData="M54,34 L53,60 L56,80 L54,108 L104,108 L104,90 Q72,62 54,34 Z" />
 
-    <!-- درخشش برف سمت سایه -->
     <path
-        android:fillColor="#DCE4EC"
-        android:pathData="M54,27 L60,30 L70,46 L63,43 L58,49 L54,44 Z" />
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M54,34 Q48.06,43.24 40.6,52.5 L45,50 L47,57 L51,52 L54,60 L54,34 Z" />
+
+    <path
+        android:fillColor="#FFBCD0EA"
+        android:pathData="M54,34 L54,60 L57,53 L61,58 L63,51 L67.4,52.5 Q59.94,43.24 54,34 Z" />
+
+    <path
+        android:fillColor="#FF0E1A2E"
+        android:pathData="M0,98 Q26,92 54,98 Q82,104 108,96 L108,108 L0,108 Z" />
 </vector>
