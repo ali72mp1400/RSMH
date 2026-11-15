@@ -10,12 +10,14 @@ object SourceManager {
     /** منابع پیش‌فرض (به ترتیب اولویت). اگه یکی بسته بود، بقیه استفاده میشن. */
     val DEFAULT_SOURCES = listOf(
         "https://raw.githubusercontent.com/0xRadikal/Free-v2ray-Configs/main/top100.txt",
+        "https://raw.githubusercontent.com/Au1rxx/free-vpn-subscriptions/main/output/v2ray-base64.txt",
         "https://raw.githubusercontent.com/0xRadikal/Free-v2ray-Configs/main/verified/configs.txt",
+        "https://raw.githubusercontent.com/barry-far/V2ray-Configs/main/Splitted-By-Protocol/vless.txt",
+        "https://raw.githubusercontent.com/barry-far/V2ray-Configs/main/Splitted-By-Protocol/trojan.txt",
         "https://raw.githubusercontent.com/Epodonios/v2ray-configs/refs/heads/main/Sub1.txt"
     )
 
-    private const val PER_SOURCE = 150
-    private const val MAX_PARSE = 1500
+    private const val PER_SOURCE = 100
     private const val KEEP = 30
 
     class Result(
@@ -25,6 +27,10 @@ object SourceManager {
         val failedSources: Int
     )
 
+    /** لیست‌های بزرگ و تست‌نشده: از وسطشون تصادفی نمونه میگیریم. */
+    private fun isBigRaw(url: String): Boolean =
+        url.contains("barry-far") || url.contains("Epodonios")
+
     /** روی thread پس‌زمینه صدا بزن. */
     fun refresh(sources: List<String>, onProgress: (String) -> Unit): Result {
         onProgress("در حال دریافت از ${sources.size} منبع...")
@@ -33,7 +39,8 @@ object SourceManager {
             sources.map { src ->
                 fetchPool.submit(Callable<List<SubscriptionParser.Node>?> {
                     try {
-                        SubscriptionParser.parseNodes(SubscriptionParser.fetchBody(src)).take(MAX_PARSE)
+                        val all = SubscriptionParser.parseNodes(SubscriptionParser.fetchBody(src))
+                        if (isBigRaw(src)) all.shuffled() else all
                     } catch (e: Exception) {
                         null
                     }
@@ -60,7 +67,7 @@ object SourceManager {
         }
 
         onProgress("تست ${candidates.size} سرور...")
-        val pool = Executors.newFixedThreadPool(24)
+        val pool = Executors.newFixedThreadPool(32)
         val pings: List<Int> = try {
             candidates.map { n ->
                 pool.submit(Callable<Int> {
@@ -92,7 +99,7 @@ object SourceManager {
             val addr = InetSocketAddress(host, port)
             if (addr.isUnresolved) return -1
             val t0 = System.nanoTime()
-            socket.connect(addr, 2500)
+            socket.connect(addr, 2000)
             ((System.nanoTime() - t0) / 1_000_000).toInt()
         } catch (e: Exception) {
             -1
