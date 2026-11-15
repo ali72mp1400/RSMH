@@ -10,8 +10,9 @@ import android.content.pm.PackageManager
 import android.net.VpnService
 import android.os.Build
 import android.os.Bundle
-import android.widget.Button
+import android.view.View
 import android.widget.EditText
+import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -26,11 +27,14 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var etConfig: EditText
     private lateinit var etDns: EditText
-    private lateinit var btnUpdate: Button
-    private lateinit var btnPing: Button
-    private lateinit var btnApps: Button
-    private lateinit var btnConnect: Button
+    private lateinit var btnUpdate: TextView
+    private lateinit var btnPing: TextView
+    private lateinit var btnApps: TextView
+    private lateinit var btnAdvanced: TextView
+    private lateinit var advancedBox: View
+    private lateinit var btnConnect: ImageView
     private lateinit var tvStatus: TextView
+    private lateinit var tvSub: TextView
     private lateinit var tvCount: TextView
     private lateinit var rv: RecyclerView
     private lateinit var adapter: ServerAdapter
@@ -42,6 +46,11 @@ class MainActivity : AppCompatActivity() {
     private val prefs by lazy { getSharedPreferences("rsmh", Context.MODE_PRIVATE) }
 
     private val sixHours = 6L * 60 * 60 * 1000
+
+    private val colorWhite = 0xFFFFFFFF.toInt()
+    private val colorGreen = 0xFF22C55E.toInt()
+    private val colorAmber = 0xFFF59E0B.toInt()
+    private val colorRed = 0xFFEF4444.toInt()
 
     private val vpnPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -64,6 +73,8 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        window.statusBarColor = 0xFF0B1220.toInt()
+        window.navigationBarColor = 0xFF122340.toInt()
         setContentView(R.layout.activity_main)
 
         etConfig = findViewById(R.id.etConfig)
@@ -71,12 +82,13 @@ class MainActivity : AppCompatActivity() {
         btnUpdate = findViewById(R.id.btnUpdate)
         btnPing = findViewById(R.id.btnPing)
         btnApps = findViewById(R.id.btnApps)
+        btnAdvanced = findViewById(R.id.btnAdvanced)
+        advancedBox = findViewById(R.id.advancedBox)
         btnConnect = findViewById(R.id.btnConnect)
         tvStatus = findViewById(R.id.tvStatus)
+        tvSub = findViewById(R.id.tvSub)
         tvCount = findViewById(R.id.tvCount)
         rv = findViewById(R.id.rvServers)
-
-        etConfig.hint = "لینک اشتراک دلخواه (اختیاری)"
 
         tvStatus.setOnLongClickListener {
             val f = File(filesDir, "box.log")
@@ -84,6 +96,11 @@ class MainActivity : AppCompatActivity() {
             AlertDialog.Builder(this).setTitle("لاگ").setMessage(text)
                 .setPositiveButton("باشه", null).show()
             true
+        }
+
+        btnAdvanced.setOnClickListener {
+            advancedBox.visibility =
+                if (advancedBox.visibility == View.VISIBLE) View.GONE else View.VISIBLE
         }
 
         if (Build.VERSION.SDK_INT >= 33 &&
@@ -156,7 +173,12 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateAppsButton() {
         val n = (prefs.getStringSet("vpn_apps", emptySet()) ?: emptySet()).size
-        btnApps.text = if (n == 0) "برنامه‌ها: همه از VPN استفاده کنند" else "برنامه‌ها: فقط $n برنامه انتخاب‌شده"
+        btnApps.text = if (n == 0) "▦ همه برنامه‌ها" else "▦ $n برنامه"
+    }
+
+    private fun setUpdateBusy(busy: Boolean) {
+        btnUpdate.isEnabled = !busy
+        btnUpdate.alpha = if (busy) 0.5f else 1f
     }
 
     private fun pickApps() {
@@ -200,7 +222,7 @@ class MainActivity : AppCompatActivity() {
     private fun refreshSources() {
         if (refreshing) return
         refreshing = true
-        btnUpdate.isEnabled = false
+        setUpdateBusy(true)
         val custom = etConfig.text.toString().trim()
         prefs.edit().putString("source", custom).apply()
         val sources = (if (custom.isNotEmpty()) listOf(custom) else emptyList()) + SourceManager.DEFAULT_SOURCES
@@ -212,7 +234,7 @@ class MainActivity : AppCompatActivity() {
             }
             runOnUiThread {
                 refreshing = false
-                btnUpdate.isEnabled = true
+                setUpdateBusy(false)
                 if (result == null) {
                     toast("خطا در به‌روزرسانی")
                     updateCount(nodes.size)
@@ -239,27 +261,30 @@ class MainActivity : AppCompatActivity() {
     private fun applyState(state: String, message: String) {
         when (state) {
             HiddifyVpnService.STATE_CONNECTED -> {
-                tvStatus.text = "متصل و ایمن ($message)"
-                setConnectButton(true)
+                tvStatus.text = "متصل شد"
+                tvStatus.setTextColor(colorGreen)
+                tvSub.text = if (message.isNotEmpty()) message else "ترافیک از VPN عبور می‌کند"
+                btnConnect.setBackgroundResource(R.drawable.bg_power_on)
             }
             HiddifyVpnService.STATE_CONNECTING -> {
                 tvStatus.text = "در حال اتصال..."
-                setConnectButton(true)
+                tvStatus.setTextColor(colorAmber)
+                tvSub.text = "لطفاً چند ثانیه صبر کن"
+                btnConnect.setBackgroundResource(R.drawable.bg_power_off)
             }
             HiddifyVpnService.STATE_ERROR -> {
-                tvStatus.text = "خطا: $message"
-                setConnectButton(false)
+                tvStatus.text = "خطا"
+                tvStatus.setTextColor(colorRed)
+                tvSub.text = message
+                btnConnect.setBackgroundResource(R.drawable.bg_power_off)
             }
             else -> {
                 tvStatus.text = "قطع شد"
-                setConnectButton(false)
+                tvStatus.setTextColor(colorWhite)
+                tvSub.text = "برای اتصال، دکمه را بزن"
+                btnConnect.setBackgroundResource(R.drawable.bg_power_off)
             }
         }
-    }
-
-    private fun setConnectButton(connected: Boolean) {
-        btnConnect.text = if (connected) "قطع اتصال" else "اتصال به سرور"
-        btnConnect.setBackgroundColor(if (connected) 0xFFCC0000.toInt() else 0xFF2D7BFF.toInt())
     }
 
     private fun prepareVpn() {
