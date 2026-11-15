@@ -27,11 +27,16 @@ class MainActivity : AppCompatActivity() {
     private lateinit var etConfig: EditText
     private lateinit var etDns: EditText
     private lateinit var btnUpdate: Button
+    private lateinit var btnPing: Button
+    private lateinit var btnApps: Button
     private lateinit var btnConnect: Button
     private lateinit var tvStatus: TextView
     private lateinit var tvCount: TextView
     private lateinit var rv: RecyclerView
     private lateinit var adapter: ServerAdapter
+
+    private var nodes: List<SubscriptionParser.Node> = emptyList()
+    private var pingGen = 0
 
     private val prefs by lazy { getSharedPreferences("rsmh", Context.MODE_PRIVATE) }
 
@@ -61,6 +66,8 @@ class MainActivity : AppCompatActivity() {
         etConfig = findViewById(R.id.etConfig)
         etDns = findViewById(R.id.etDns)
         btnUpdate = findViewById(R.id.btnUpdate)
+        btnPing = findViewById(R.id.btnPing)
+        btnApps = findViewById(R.id.btnApps)
         btnConnect = findViewById(R.id.btnConnect)
         tvStatus = findViewById(R.id.tvStatus)
         tvCount = findViewById(R.id.tvCount)
@@ -90,11 +97,15 @@ class MainActivity : AppCompatActivity() {
         rv.adapter = adapter
 
         val body = prefs.getString("body", "") ?: ""
-        val saved = try { SubscriptionParser.parseNodes(body) } catch (e: Exception) { emptyList() }
-        adapter.submit(saved)
-        updateCount(saved.size)
+        nodes = try { SubscriptionParser.parseNodes(body) } catch (e: Exception) { emptyList() }
+        adapter.submit(nodes)
+        updateCount(nodes.size)
+        updateAppsButton()
+        runPingTest()
 
         btnUpdate.setOnClickListener { updateSubscription() }
+        btnPing.setOnClickListener { runPingTest() }
+        btnApps.setOnClickListener { pickApps() }
 
         btnConnect.setOnClickListener {
             val s = HiddifyVpnService.state
@@ -127,6 +138,48 @@ class MainActivity : AppCompatActivity() {
         tvCount.text = if (n > 0) "فهرست سرورها ($n)" else "فهرست سرورها"
     }
 
+    private fun updateAppsButton() {
+        val n = (prefs.getStringSet("vpn_apps", emptySet()) ?: emptySet()).size
+        btnApps.text = if (n == 0) "برنامه‌ها: همه از VPN استفاده کنند" else "برنامه‌ها: فقط $n برنامه انتخاب‌شده"
+    }
+
+    private fun pickApps() {
+        val pm = packageManager
+        val launcher = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+        val apps = pm.queryIntentActivities(launcher, 0)
+            .map { it.activityInfo.packageName to it.loadLabel(pm).toString() }
+            .filter { it.first != packageName }
+            .distinctBy { it.first }
+            .sortedBy { it.second.lowercase() }
+        val saved = prefs.getStringSet("vpn_apps", emptySet()) ?: emptySet()
+        val checked = BooleanArray(apps.size) { apps[it].first in saved }
+        AlertDialog.Builder(this)
+            .setTitle("برنامه‌هایی که از VPN استفاده کنند")
+            .setMultiChoiceItems(apps.map { it.second }.toTypedArray(), checked) { _, i, c -> checked[i] = c }
+            .setPositiveButton("ذخیره") { _, _ ->
+                val set = apps.indices.filter { checked[it] }.map { apps[it].first }.toSet()
+                prefs.edit().putStringSet("vpn_apps", set).apply()
+                updateAppsButton()
+                toast("از اتصال بعدی اعمال میشه")
+            }
+            .setNeutralButton("همه برنامه‌ها") { _, _ ->
+                prefs.edit().remove("vpn_apps").apply()
+                updateAppsButton()
+                toast("از اتصال بعدی اعمال میشه")
+            }
+            .setNegativeButton("لغو", null)
+            .show()
+    }
+
+    private fun runPingTest() {
+        if (nodes.isEmpty()) return
+        val gen = ++pingGen
+        adapter.resetPings()
+        LatencyTester.test(nodes) { i, ms ->
+            runOnUiThread { if (gen == pingGen) adapter.setPing(i, ms) }
+        }
+    }
+
     private fun updateSubscription() {
         val src = etConfig.text.toString().trim()
         if (src.isEmpty()) {
@@ -137,17 +190,19 @@ class MainActivity : AppCompatActivity() {
         Thread {
             try {
                 val body = SubscriptionParser.fetchBody(src)
-                val nodes = SubscriptionParser.parseNodes(body)
+                val parsed = SubscriptionParser.parseNodes(body)
                 runOnUiThread {
-                    if (nodes.isEmpty()) {
+                    if (parsed.isEmpty()) {
                         toast("هیچ کانفیگ معتبری پیدا نشد")
                     } else {
                         prefs.edit().putString("source", src).putString("body", body)
                             .putInt("selected", 0).apply()
+                        nodes = parsed
                         adapter.selected = 0
-                        adapter.submit(nodes)
-                        updateCount(nodes.size)
-                        toast("${nodes.size} سرور دریافت شد")
+                        adapter.submit(parsed)
+                        updateCount(parsed.size)
+                        toast("${parsed.size} سرور دریافت شد")
+                        runPingTest()
                     }
                     btnUpdate.isEnabled = true
                 }
