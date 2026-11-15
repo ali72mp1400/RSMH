@@ -37,8 +37,11 @@ class MainActivity : AppCompatActivity() {
 
     private var nodes: List<SubscriptionParser.Node> = emptyList()
     private var pingGen = 0
+    private var refreshing = false
 
     private val prefs by lazy { getSharedPreferences("rsmh", Context.MODE_PRIVATE) }
+
+    private val sixHours = 6L * 60 * 60 * 1000
 
     private val vpnPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -73,6 +76,8 @@ class MainActivity : AppCompatActivity() {
         tvCount = findViewById(R.id.tvCount)
         rv = findViewById(R.id.rvServers)
 
+        etConfig.hint = "لینک اشتراک دلخواه (اختیاری)"
+
         tvStatus.setOnLongClickListener {
             val f = File(filesDir, "box.log")
             val text = if (f.exists()) f.readLines().takeLast(30).joinToString("\n") else "لاگی نیست"
@@ -101,9 +106,8 @@ class MainActivity : AppCompatActivity() {
         adapter.submit(nodes)
         updateCount(nodes.size)
         updateAppsButton()
-        runPingTest()
 
-        btnUpdate.setOnClickListener { updateSubscription() }
+        btnUpdate.setOnClickListener { refreshSources() }
         btnPing.setOnClickListener { runPingTest() }
         btnApps.setOnClickListener { pickApps() }
 
@@ -114,6 +118,13 @@ class MainActivity : AppCompatActivity() {
             } else {
                 prepareVpn()
             }
+        }
+
+        val last = prefs.getLong("last_refresh", 0L)
+        if (nodes.isEmpty() || System.currentTimeMillis() - last > sixHours) {
+            refreshSources()
+        } else {
+            runPingTest()
         }
     }
 
@@ -135,7 +146,12 @@ class MainActivity : AppCompatActivity() {
     private fun toast(msg: String) = Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
 
     private fun updateCount(n: Int) {
-        tvCount.text = if (n > 0) "فهرست سرورها ($n)" else "فهرست سرورها"
+        val last = prefs.getLong("last_refresh", 0L)
+        val age = if (last == 0L) "" else {
+            val min = (System.currentTimeMillis() - last) / 60000
+            if (min < 60) " • $min دقیقه پیش" else " • ${min / 60} ساعت پیش"
+        }
+        tvCount.text = if (n > 0) "فهرست سرورها ($n)$age" else "فهرست سرورها"
     }
 
     private fun updateAppsButton() {
@@ -180,36 +196,41 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun updateSubscription() {
-        val src = etConfig.text.toString().trim()
-        if (src.isEmpty()) {
-            toast("لینک اشتراک رو وارد کن")
-            return
-        }
+    /** از منابع خودکار (و لینک دلخواه) لیست میگیره، تست میکنه و ۳۰ سرور برتر رو نگه میداره. */
+    private fun refreshSources() {
+        if (refreshing) return
+        refreshing = true
         btnUpdate.isEnabled = false
+        val custom = etConfig.text.toString().trim()
+        prefs.edit().putString("source", custom).apply()
+        val sources = (if (custom.isNotEmpty()) listOf(custom) else emptyList()) + SourceManager.DEFAULT_SOURCES
         Thread {
-            try {
-                val body = SubscriptionParser.fetchBody(src)
-                val parsed = SubscriptionParser.parseNodes(body)
-                runOnUiThread {
-                    if (parsed.isEmpty()) {
-                        toast("هیچ کانفیگ معتبری پیدا نشد")
-                    } else {
-                        prefs.edit().putString("source", src).putString("body", body)
-                            .putInt("selected", 0).apply()
-                        nodes = parsed
-                        adapter.selected = 0
-                        adapter.submit(parsed)
-                        updateCount(parsed.size)
-                        toast("${parsed.size} سرور دریافت شد")
-                        runPingTest()
-                    }
-                    btnUpdate.isEnabled = true
-                }
+            val result = try {
+                SourceManager.refresh(sources) { msg -> runOnUiThread { tvCount.text = msg } }
             } catch (e: Exception) {
-                runOnUiThread {
-                    toast("خطا: ${e.message}")
-                    btnUpdate.isEnabled = true
+                null
+            }
+            runOnUiThread {
+                refreshing = false
+                btnUpdate.isEnabled = true
+                if (result == null) {
+                    toast("خطا در به‌روزرسانی")
+                    updateCount(nodes.size)
+                } else if (result.nodes.isEmpty()) {
+                    toast("سرور سالمی پیدا نشد (اینترنت یا منابع رو چک کن)")
+                    updateCount(nodes.size)
+                } else {
+                    prefs.edit()
+                        .putString("body", result.nodes.joinToString("\n") { it.raw })
+                        .putLong("last_refresh", System.currentTimeMillis())
+                        .putInt("selected", 0)
+                        .apply()
+                    nodes = result.nodes
+                    adapter.selected = 0
+                    adapter.submit(nodes)
+                    result.pings.forEachIndexed { i, ms -> adapter.setPing(i, ms) }
+                    updateCount(nodes.size)
+                    toast("${nodes.size} سرور سالم از ${result.candidates} تست‌شده")
                 }
             }
         }.start()
@@ -244,7 +265,7 @@ class MainActivity : AppCompatActivity() {
     private fun prepareVpn() {
         val body = prefs.getString("body", "") ?: ""
         if (body.isEmpty()) {
-            toast("اول لینک اشتراک رو بذار و به‌روزرسانی بزن")
+            toast("هنوز لیست سرورها آماده نیست. چند ثانیه صبر کن یا به‌روزرسانی بزن")
             return
         }
         val intent = VpnService.prepare(this)
