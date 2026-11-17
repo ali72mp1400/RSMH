@@ -8,12 +8,15 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.content.res.ColorStateList
+import android.net.TrafficStats
 import android.net.VpnService
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.Process
 import android.view.View
+import android.view.ViewGroup
 import android.widget.EditText
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -50,6 +53,14 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvStatUpdated: TextView
     private lateinit var tvStatApps: TextView
 
+    private lateinit var tvLive: TextView
+    private lateinit var tvDown: TextView
+    private lateinit var tvUp: TextView
+    private lateinit var tvTotalDown: TextView
+    private lateinit var tvTotalUp: TextView
+    private lateinit var tvPeak: TextView
+    private lateinit var graph: TrafficGraphView
+
     private lateinit var btnUpdate: LinearLayout
     private lateinit var btnPing: LinearLayout
     private lateinit var btnFastest: LinearLayout
@@ -71,6 +82,10 @@ class MainActivity : AppCompatActivity() {
     private var pingGen = 0
     private var refreshing = false
 
+    private var lastRx = 0L
+    private var lastTx = 0L
+    private var peakDown = 0L
+
     private val handler = Handler(Looper.getMainLooper())
     private val prefs by lazy { getSharedPreferences("rsmh", Context.MODE_PRIVATE) }
     private val sixHours = 6L * 60 * 60 * 1000
@@ -81,15 +96,60 @@ class MainActivity : AppCompatActivity() {
     private val colorRed = 0xFFEF4444.toInt()
     private val colorMuted = 0xFF9FB2C6.toInt()
 
+    private fun uidRx(): Long {
+        val v = TrafficStats.getUidRxBytes(Process.myUid())
+        return if (v < 0) 0L else v
+    }
+
+    private fun uidTx(): Long {
+        val v = TrafficStats.getUidTxBytes(Process.myUid())
+        return if (v < 0) 0L else v
+    }
+
+    private fun fmtSpeed(b: Long): String = when {
+        b >= 1_048_576L -> String.format(Locale.US, "%.1f MB/s", b / 1_048_576.0)
+        b >= 1024L -> String.format(Locale.US, "%d KB/s", b / 1024)
+        else -> "$b B/s"
+    }
+
+    private fun fmtSize(b: Long): String = when {
+        b >= 1_073_741_824L -> String.format(Locale.US, "%.2f GB", b / 1_073_741_824.0)
+        b >= 1_048_576L -> String.format(Locale.US, "%.1f MB", b / 1_048_576.0)
+        b >= 1024L -> String.format(Locale.US, "%d KB", b / 1024)
+        else -> "$b B"
+    }
+
     private val tick = object : Runnable {
         override fun run() {
+            if (HiddifyVpnService.state != HiddifyVpnService.STATE_CONNECTED) return
+
             val since = prefs.getLong("connected_at", 0L)
-            if (since > 0 && HiddifyVpnService.state == HiddifyVpnService.STATE_CONNECTED) {
+            if (since > 0) {
                 val s = (System.currentTimeMillis() - since) / 1000
                 val t = String.format(Locale.US, "%02d:%02d:%02d", s / 3600, (s % 3600) / 60, s % 60)
                 tvTimer.text = "$t · تونل آماده است"
-                handler.postDelayed(this, 1000)
             }
+
+            val rx = uidRx()
+            val tx = uidTx()
+            if (lastRx == 0L) {
+                lastRx = rx
+                lastTx = tx
+            }
+            val dRx = maxOf(0L, rx - lastRx)
+            val dTx = maxOf(0L, tx - lastTx)
+            lastRx = rx
+            lastTx = tx
+
+            tvDown.text = fmtSpeed(dRx)
+            tvUp.text = fmtSpeed(dTx)
+            graph.push(dRx.toFloat(), dTx.toFloat())
+            if (dRx > peakDown) peakDown = dRx
+            tvPeak.text = fmtSpeed(peakDown)
+            tvTotalDown.text = fmtSize(maxOf(0L, rx - prefs.getLong("base_rx", rx)))
+            tvTotalUp.text = fmtSize(maxOf(0L, tx - prefs.getLong("base_tx", tx)))
+
+            handler.postDelayed(this, 1000)
         }
     }
 
@@ -119,7 +179,9 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         bindViews()
+        addTrafficCard()
         styleViews()
+        resetTraffic()
 
         if (Build.VERSION.SDK_INT >= 33 &&
             ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
@@ -225,6 +287,36 @@ class MainActivity : AppCompatActivity() {
         swMemory = findViewById(R.id.swMemory)
         rowLog = findViewById(R.id.rowLog)
         rowAbout = findViewById(R.id.rowAbout)
+    }
+
+    /** کارت ترافیک زنده رو درست زیر دایره اضافه میکنه. */
+    private fun addTrafficCard() {
+        val dial = btnConnect.parent as ViewGroup
+        val col = dial.parent as ViewGroup
+        val card = layoutInflater.inflate(R.layout.view_traffic, col, false)
+        col.addView(card, col.indexOfChild(dial) + 1)
+        Ui.card(card)
+        tvLive = card.findViewById(R.id.tvLive)
+        tvDown = card.findViewById(R.id.tvDown)
+        tvUp = card.findViewById(R.id.tvUp)
+        tvTotalDown = card.findViewById(R.id.tvTotalDown)
+        tvTotalUp = card.findViewById(R.id.tvTotalUp)
+        tvPeak = card.findViewById(R.id.tvPeak)
+        graph = card.findViewById(R.id.graph)
+    }
+
+    private fun resetTraffic() {
+        lastRx = 0L
+        lastTx = 0L
+        peakDown = 0L
+        tvDown.text = "0 B/s"
+        tvUp.text = "0 B/s"
+        tvPeak.text = "—"
+        tvTotalDown.text = "0 B"
+        tvTotalUp.text = "0 B"
+        tvLive.text = "○ آماده"
+        tvLive.setTextColor(colorMuted)
+        graph.clear()
     }
 
     private fun styleViews() {
@@ -439,8 +531,16 @@ class MainActivity : AppCompatActivity() {
                 tvPowerLabel.text = "قطع اتصال"
                 Ui.powerOn(btnConnect)
                 if (prefs.getLong("connected_at", 0L) == 0L) {
-                    prefs.edit().putLong("connected_at", System.currentTimeMillis()).apply()
+                    prefs.edit()
+                        .putLong("connected_at", System.currentTimeMillis())
+                        .putLong("base_rx", uidRx())
+                        .putLong("base_tx", uidTx())
+                        .apply()
                 }
+                lastRx = 0L
+                lastTx = 0L
+                tvLive.text = "● زنده"
+                tvLive.setTextColor(colorGreen)
                 handler.removeCallbacks(tick)
                 handler.post(tick)
             }
@@ -460,6 +560,7 @@ class MainActivity : AppCompatActivity() {
                 Ui.powerOff(btnConnect)
                 prefs.edit().remove("connected_at").apply()
                 handler.removeCallbacks(tick)
+                resetTraffic()
             }
             else -> {
                 tvStatus.text = "قطع شد"
@@ -469,6 +570,7 @@ class MainActivity : AppCompatActivity() {
                 Ui.powerOff(btnConnect)
                 prefs.edit().remove("connected_at").apply()
                 handler.removeCallbacks(tick)
+                resetTraffic()
             }
         }
     }
