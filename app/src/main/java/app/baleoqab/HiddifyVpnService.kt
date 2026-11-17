@@ -102,6 +102,8 @@ class HiddifyVpnService : VpnService(), PlatformInterface, CommandServerHandler 
         const val EXTRA_CONFIG = "extra_config"
         const val EXTRA_DNS = "extra_dns"
         const val EXTRA_INDEX = "extra_index"
+        const val EXTRA_INDICES = "extra_indices"
+        const val EXTRA_SLOW = "extra_slow"
         const val EXTRA_STATE = "state"
         const val EXTRA_MESSAGE = "message"
         const val STATE_DISCONNECTED = "disconnected"
@@ -129,10 +131,12 @@ class HiddifyVpnService : VpnService(), PlatformInterface, CommandServerHandler 
                 val config = intent.getStringExtra(EXTRA_CONFIG) ?: ""
                 val dns = intent.getStringExtra(EXTRA_DNS) ?: ""
                 val index = intent.getIntExtra(EXTRA_INDEX, -1)
+                val indices = intent.getIntArrayExtra(EXTRA_INDICES)
+                val slow = intent.getBooleanExtra(EXTRA_SLOW, true)
                 startForegroundCompat()
                 if (state != STATE_CONNECTING && state != STATE_CONNECTED) {
                     publish(STATE_CONNECTING, "")
-                    Thread { connect(config, dns, index) }.start()
+                    Thread { connect(config, dns, index, indices, slow) }.start()
                 }
             }
             ACTION_DISCONNECT -> disconnect()
@@ -140,17 +144,23 @@ class HiddifyVpnService : VpnService(), PlatformInterface, CommandServerHandler 
         return START_NOT_STICKY
     }
 
-    private fun connect(input: String, dnsInput: String, index: Int) {
+    private fun connect(input: String, dnsInput: String, index: Int, indices: IntArray?, slow: Boolean) {
         try {
             val all = SubscriptionParser.load(input)
-            val nodes = if (index in all.indices) listOf(all[index]) else all
+            val nodes = when {
+                indices != null && indices.isNotEmpty() ->
+                    indices.filter { it in all.indices }.map { all[it] }.ifEmpty { all }
+                index in all.indices -> listOf(all[index])
+                else -> all
+            }
             if (nodes.isEmpty()) throw IllegalStateException("هیچ کانفیگ معتبری پیدا نشد")
             val logFile = File(filesDir, "box.log")
             logFile.delete()
             val configJson = ConfigBuilder.build(
                 nodes,
                 DnsConfigGenerator.generateDnsRules(dnsInput),
-                logFile.path
+                logFile.path,
+                slow
             )
             Libbox.checkConfig(configJson)
             setupLibbox()

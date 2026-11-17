@@ -18,16 +18,28 @@ object SubscriptionParser {
     fun load(input: String): List<JSONObject> = parseNodes(fetchBody(input)).map { it.outbound }
 
     /** اگه ورودی لینک باشه دانلود میکنه (با آینه‌های جایگزین)، وگرنه خود متن رو برمیگردونه. */
-    fun fetchBody(input: String): String {
+    fun fetchBody(
+        input: String,
+        connectMs: Int = 10000,
+        readMs: Int = 10000,
+        maxBytes: Int = 2_000_000,
+        retries: Int = 0,
+        deadline: Long = Long.MAX_VALUE
+    ): String {
         val t = input.trim()
         if (!(t.startsWith("http://") || t.startsWith("https://"))) return t
         var lastError: Exception? = null
-        for (u in candidates(t)) {
-            try {
-                val body = download(u)
-                if (body.isNotBlank()) return body
-            } catch (e: Exception) {
-                lastError = e
+        for (attempt in 0..retries) {
+            for (u in candidates(t)) {
+                if (System.currentTimeMillis() > deadline) {
+                    throw lastError ?: IllegalStateException("timeout")
+                }
+                try {
+                    val body = download(u, connectMs, readMs, maxBytes)
+                    if (body.isNotBlank()) return body
+                } catch (e: Exception) {
+                    lastError = e
+                }
             }
         }
         throw lastError ?: IllegalStateException("پاسخ خالی بود")
@@ -46,13 +58,36 @@ object SubscriptionParser {
         return list
     }
 
-    private fun download(url: String): String {
+    /** دانلود با سقف حجم (برای اینترنت ضعیف). */
+    fun download(url: String, connectMs: Int, readMs: Int, maxBytes: Int): String {
         val conn = URL(url).openConnection() as HttpURLConnection
-        conn.connectTimeout = 10000
-        conn.readTimeout = 10000
+        conn.connectTimeout = connectMs
+        conn.readTimeout = readMs
+        conn.instanceFollowRedirects = true
         conn.setRequestProperty("User-Agent", "sing-box")
         return try {
-            conn.inputStream.bufferedReader().use { it.readText() }
+            val code = conn.responseCode
+            if (code !in 200..299) throw java.io.IOException("HTTP $code")
+            val out = java.io.ByteArrayOutputStream()
+            conn.inputStream.use { ins ->
+                val buf = ByteArray(8192)
+                while (out.size() < maxBytes) {
+                    val n = ins.read(buf)
+                    if (n < 0) break
+                    out.write(buf, 0, n)
+                }
+            }
+            var text = out.toString("UTF-8")
+            if (out.size() >= maxBytes) {
+                // خروجی ناقص: خط آخر رو دور بنداز
+                text = if (text.contains("://")) {
+                    text.substringBeforeLast('\n', text)
+                } else {
+                    val clean = text.filter { !it.isWhitespace() }
+                    clean.substring(0, clean.length - clean.length % 4)
+                }
+            }
+            text
         } finally {
             conn.disconnect()
         }

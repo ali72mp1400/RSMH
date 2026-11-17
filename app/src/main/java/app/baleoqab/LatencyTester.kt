@@ -28,7 +28,7 @@ object LatencyTester {
             val addr = InetSocketAddress(host, port)
             if (addr.isUnresolved) return -1
             val t0 = System.nanoTime()
-            socket.connect(addr, 3000)
+            socket.connect(addr, 5000)
             ((System.nanoTime() - t0) / 1_000_000).toInt()
         } catch (e: Exception) {
             -1
