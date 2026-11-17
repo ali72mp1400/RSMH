@@ -33,16 +33,24 @@ class ServerAdapter(private val onSelect: (Int) -> Unit) :
         }
     }
 
-    private var items: List<Triple<String, String, String>> = emptyList()
+    private val white = 0xFFE6EDF7.toInt()
+    private val green = 0xFF4ADE80.toInt()
+    private val muted = 0xFF9FB2C6.toInt()
+
+    private var names: List<String> = emptyList()
+    private var infos: List<String> = emptyList()
+    private var badges: List<String> = emptyList()
     private var pings = IntArray(0)
+    private var connected = -1
     var selected = 0
 
     fun submit(nodes: List<SubscriptionParser.Node>) {
-        val list = mutableListOf(Triple("خودکار (بهترین سرور)", "انتخاب خودکار بین همه سرورها", "AU"))
-        nodes.forEach { list.add(Triple(it.name, describe(it), badgeOf(it.outbound))) }
-        items = list
+        names = nodes.map { it.name }
+        infos = nodes.map { describe(it) }
+        badges = nodes.map { badgeOf(it.outbound) }
         pings = IntArray(nodes.size) { NOT_TESTED }
-        if (selected >= items.size) selected = 0
+        connected = -1
+        if (selected > nodes.size) selected = 0
         notifyDataSetChanged()
     }
 
@@ -55,9 +63,19 @@ class ServerAdapter(private val onSelect: (Int) -> Unit) :
         if (nodeIndex !in pings.indices) return
         pings[nodeIndex] = ms
         notifyItemChanged(nodeIndex + 1)
+        if (nodeIndex == connected) notifyItemChanged(0)
     }
 
     fun pingOf(nodeIndex: Int): Int = if (nodeIndex in pings.indices) pings[nodeIndex] else NOT_TESTED
+
+    /** سروری که الان واقعاً بهش وصلیم (اندیس در لیست سرورها)، یا -1. */
+    fun setConnected(i: Int) {
+        val old = connected
+        connected = i
+        notifyItemChanged(0)
+        if (old >= 0) notifyItemChanged(old + 1)
+        if (i >= 0) notifyItemChanged(i + 1)
+    }
 
     private fun describe(n: SubscriptionParser.Node): String {
         val ob = n.outbound
@@ -80,23 +98,41 @@ class ServerAdapter(private val onSelect: (Int) -> Unit) :
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH =
         VH(LayoutInflater.from(parent.context).inflate(R.layout.item_server, parent, false))
 
-    override fun getItemCount(): Int = items.size
+    override fun getItemCount(): Int = names.size + 1
 
     override fun onBindViewHolder(h: VH, position: Int) {
-        val (name, info, badge) = items[position]
-        h.name.text = name
-        h.info.text = info
-        h.badge.text = badge
-        Ui.badge(h.badge)
         h.rb.isChecked = position == selected
         if (position == selected) Ui.cardSel(h.row) else Ui.card(h.row)
-        if (position == 0 || position - 1 !in pings.indices) {
-            h.ping.text = ""
+        Ui.badge(h.badge)
+
+        if (position == 0) {
+            h.badge.text = "AU"
+            h.name.text = "⚡ خودکار (بهترین سرور)"
+            h.name.setTextColor(white)
+            if (selected == 0 && connected in names.indices) {
+                h.info.text = "متصل به: ${names[connected]}"
+                h.info.setTextColor(green)
+                val (t, c) = pingText(pings[connected])
+                h.ping.text = t
+                h.ping.setTextColor(c)
+            } else {
+                h.info.text = "انتخاب خودکار بین همه سرورها"
+                h.info.setTextColor(muted)
+                h.ping.text = ""
+            }
         } else {
-            val (text, color) = pingText(pings[position - 1])
-            h.ping.text = text
-            h.ping.setTextColor(color)
+            val idx = position - 1
+            h.badge.text = badges[idx]
+            val isConn = idx == connected
+            h.name.text = if (isConn) "● ${names[idx]}" else names[idx]
+            h.name.setTextColor(if (isConn) green else white)
+            h.info.text = infos[idx]
+            h.info.setTextColor(muted)
+            val (t, c) = pingText(pings[idx])
+            h.ping.text = t
+            h.ping.setTextColor(c)
         }
+
         h.row.setOnClickListener {
             val pos = h.bindingAdapterPosition
             if (pos == RecyclerView.NO_POSITION) return@setOnClickListener
