@@ -44,14 +44,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var ringDash: View
     private lateinit var tvPowerLabel: TextView
     private lateinit var cardActive: View
-    private lateinit var cardStats: View
     private lateinit var tvActiveBadge: TextView
     private lateinit var tvActiveName: TextView
     private lateinit var tvActiveInfo: TextView
     private lateinit var tvActivePing: TextView
-    private lateinit var tvStatServers: TextView
-    private lateinit var tvStatUpdated: TextView
-    private lateinit var tvStatApps: TextView
 
     private lateinit var tvLive: TextView
     private lateinit var tvDown: TextView
@@ -73,6 +69,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var etDns: EditText
     private lateinit var etConfig: EditText
     private lateinit var swAuto: SwitchCompat
+    private lateinit var swAutoConnect: SwitchCompat
     private lateinit var swRescue: SwitchCompat
     private lateinit var swMemory: SwitchCompat
     private lateinit var rowLog: View
@@ -81,6 +78,11 @@ class MainActivity : AppCompatActivity() {
     private var nodes: List<SubscriptionParser.Node> = emptyList()
     private var pingGen = 0
     private var refreshing = false
+    private var autoConnectDone = false
+
+    private var connectedIdx = -1
+    private var polling = false
+    private var tickCount = 0
 
     private var lastRx = 0L
     private var lastTx = 0L
@@ -149,6 +151,8 @@ class MainActivity : AppCompatActivity() {
             tvTotalDown.text = fmtSize(maxOf(0L, rx - prefs.getLong("base_rx", rx)))
             tvTotalUp.text = fmtSize(maxOf(0L, tx - prefs.getLong("base_tx", tx)))
 
+            if (tickCount % 3 == 0) pollActive()
+            tickCount++
             handler.postDelayed(this, 1000)
         }
     }
@@ -194,6 +198,8 @@ class MainActivity : AppCompatActivity() {
         etDns.setText(prefs.getString("dns", ""))
         swAuto.isChecked = prefs.getBoolean("auto_update", true)
         swAuto.setOnCheckedChangeListener { _, c -> prefs.edit().putBoolean("auto_update", c).apply() }
+        swAutoConnect.isChecked = prefs.getBoolean("auto_connect", true)
+        swAutoConnect.setOnCheckedChangeListener { _, c -> prefs.edit().putBoolean("auto_connect", c).apply() }
         swRescue.isEnabled = false
         swMemory.isEnabled = false
 
@@ -215,7 +221,7 @@ class MainActivity : AppCompatActivity() {
         navs[2].setOnClickListener { showTab(2) }
         showTab(0)
 
-        btnUpdate.setOnClickListener { refreshSources() }
+        btnUpdate.setOnClickListener { refreshSources(false) }
         btnPing.setOnClickListener { runPingTest() }
         btnFastest.setOnClickListener { selectFastest() }
         rowApps.setOnClickListener { pickApps() }
@@ -240,10 +246,13 @@ class MainActivity : AppCompatActivity() {
 
         val last = prefs.getLong("last_refresh", 0L)
         val old = System.currentTimeMillis() - last > sixHours
-        if (nodes.isEmpty() || (swAuto.isChecked && old)) {
-            refreshSources()
+        val busy = HiddifyVpnService.state == HiddifyVpnService.STATE_CONNECTED ||
+            HiddifyVpnService.state == HiddifyVpnService.STATE_CONNECTING
+        if (!busy && (nodes.isEmpty() || (swAuto.isChecked && old))) {
+            refreshSources(true)
         } else {
             runPingTest()
+            maybeAutoConnect()
         }
     }
 
@@ -265,14 +274,10 @@ class MainActivity : AppCompatActivity() {
         ringDash = findViewById(R.id.ringDash)
         tvPowerLabel = findViewById(R.id.tvPowerLabel)
         cardActive = findViewById(R.id.cardActive)
-        cardStats = findViewById(R.id.cardStats)
         tvActiveBadge = findViewById(R.id.tvActiveBadge)
         tvActiveName = findViewById(R.id.tvActiveName)
         tvActiveInfo = findViewById(R.id.tvActiveInfo)
         tvActivePing = findViewById(R.id.tvActivePing)
-        tvStatServers = findViewById(R.id.tvStatServers)
-        tvStatUpdated = findViewById(R.id.tvStatUpdated)
-        tvStatApps = findViewById(R.id.tvStatApps)
         btnUpdate = findViewById(R.id.btnUpdate)
         btnPing = findViewById(R.id.btnPing)
         btnFastest = findViewById(R.id.btnFastest)
@@ -283,6 +288,7 @@ class MainActivity : AppCompatActivity() {
         etDns = findViewById(R.id.etDns)
         etConfig = findViewById(R.id.etConfig)
         swAuto = findViewById(R.id.swAuto)
+        swAutoConnect = findViewById(R.id.swAutoConnect)
         swRescue = findViewById(R.id.swRescue)
         swMemory = findViewById(R.id.swMemory)
         rowLog = findViewById(R.id.rowLog)
@@ -324,7 +330,6 @@ class MainActivity : AppCompatActivity() {
         Ui.navBar(findViewById<View>(R.id.nav))
         Ui.card(tvChip)
         Ui.card(cardActive)
-        Ui.card(cardStats)
         Ui.badge(tvActiveBadge)
         Ui.ringDash(ringDash)
         Ui.card(btnUpdate)
@@ -380,31 +385,57 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateSummary() {
-        tvChip.text = if (nodes.isEmpty()) "بدون سرور" else "${nodes.size} سرور"
-        tvStatServers.text = nodes.size.toString()
         val last = prefs.getLong("last_refresh", 0L)
-        tvStatUpdated.text = if (last == 0L) "—" else ageText(last)
+        tvChip.text = if (nodes.isEmpty()) "بدون سرور" else
+            "${nodes.size} سرور" + (if (last == 0L) "" else " • ${ageText(last)} پیش")
         val n = appsCount()
-        tvStatApps.text = if (n == 0) "همه" else n.toString()
         tvAppsValue.text = (if (n == 0) "همه" else "$n برنامه") + " ›"
     }
 
     private fun updateActiveCard() {
-        val sel = adapter.selected
-        if (sel <= 0 || sel - 1 >= nodes.size) {
+        val connected = HiddifyVpnService.state == HiddifyVpnService.STATE_CONNECTED
+        val idx: Int = when {
+            connected && connectedIdx in nodes.indices -> connectedIdx
+            adapter.selected > 0 && adapter.selected - 1 in nodes.indices -> adapter.selected - 1
+            else -> -1
+        }
+        if (idx < 0) {
             tvActiveBadge.text = "AU"
             tvActiveName.text = "خودکار"
             tvActiveInfo.text = if (nodes.isEmpty()) "هنوز سروری نیست" else "بهترین بین ${nodes.size} سرور"
             tvActivePing.text = ""
         } else {
-            val n = nodes[sel - 1]
+            val n = nodes[idx]
             tvActiveBadge.text = ServerAdapter.badgeOf(n.outbound)
             tvActiveName.text = n.name
             tvActiveInfo.text = "${n.outbound.optString("server")}:${n.outbound.optInt("server_port")}"
-            val (t, c) = ServerAdapter.pingText(adapter.pingOf(sel - 1))
+            val (t, c) = ServerAdapter.pingText(adapter.pingOf(idx))
             tvActivePing.text = t
             tvActivePing.setTextColor(c)
         }
+    }
+
+    /** از API محلی هسته میپرسه الان کدوم سرور انتخاب شده. */
+    private fun pollActive() {
+        if (polling) return
+        polling = true
+        Thread {
+            val tag = ClashClient.currentTag()
+            runOnUiThread {
+                polling = false
+                if (HiddifyVpnService.state == HiddifyVpnService.STATE_CONNECTED) {
+                    val i = (tag?.removePrefix("proxy-")?.toIntOrNull() ?: 0) - 1
+                    setConnectedIndex(if (i in nodes.indices) i else -1)
+                }
+            }
+        }.start()
+    }
+
+    private fun setConnectedIndex(i: Int) {
+        if (i == connectedIdx) return
+        connectedIdx = i
+        adapter.setConnected(i)
+        updateActiveCard()
     }
 
     private fun showLog() {
@@ -484,8 +515,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     /** از منابع خودکار (و لینک دلخواه) لیست میگیره، تست میکنه و ۳۰ سرور برتر رو نگه میداره. */
-    private fun refreshSources() {
+    private fun refreshSources(auto: Boolean) {
         if (refreshing) return
+        val st = HiddifyVpnService.state
+        if (st == HiddifyVpnService.STATE_CONNECTED || st == HiddifyVpnService.STATE_CONNECTING) {
+            if (!auto) toast("اول اتصال رو قطع کن، بعد به‌روزرسانی بزن")
+            return
+        }
         refreshing = true
         setUpdateBusy(true)
         val custom = etConfig.text.toString().trim()
@@ -519,8 +555,19 @@ class MainActivity : AppCompatActivity() {
                     updateCount(nodes.size)
                     toast("${nodes.size} سرور سالم از ${result.candidates} تست‌شده")
                 }
+                maybeAutoConnect()
             }
         }.start()
+    }
+
+    /** اگه کلید روشن باشه، یک بار بعد از آماده شدن لیست خودش وصل میشه. */
+    private fun maybeAutoConnect() {
+        if (autoConnectDone) return
+        autoConnectDone = true
+        if (!swAutoConnect.isChecked) return
+        if (HiddifyVpnService.state != HiddifyVpnService.STATE_DISCONNECTED) return
+        if ((prefs.getString("body", "") ?: "").isEmpty()) return
+        prepareVpn()
     }
 
     private fun applyState(state: String, message: String) {
@@ -539,6 +586,7 @@ class MainActivity : AppCompatActivity() {
                 }
                 lastRx = 0L
                 lastTx = 0L
+                tickCount = 0
                 tvLive.text = "● زنده"
                 tvLive.setTextColor(colorGreen)
                 handler.removeCallbacks(tick)
@@ -547,7 +595,7 @@ class MainActivity : AppCompatActivity() {
             HiddifyVpnService.STATE_CONNECTING -> {
                 tvStatus.text = "در حال اتصال..."
                 tvStatus.setTextColor(colorAmber)
-                tvTimer.text = "لطفاً چند ثانیه صبر کن"
+                tvTimer.text = "در حال پیدا کردن سریع‌ترین سرور"
                 tvPowerLabel.text = "لغو"
                 Ui.powerWait(btnConnect)
                 handler.removeCallbacks(tick)
@@ -561,6 +609,7 @@ class MainActivity : AppCompatActivity() {
                 prefs.edit().remove("connected_at").apply()
                 handler.removeCallbacks(tick)
                 resetTraffic()
+                setConnectedIndex(-1)
             }
             else -> {
                 tvStatus.text = "قطع شد"
@@ -571,8 +620,10 @@ class MainActivity : AppCompatActivity() {
                 prefs.edit().remove("connected_at").apply()
                 handler.removeCallbacks(tick)
                 resetTraffic()
+                setConnectedIndex(-1)
             }
         }
+        updateActiveCard()
     }
 
     private fun prepareVpn() {
